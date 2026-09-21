@@ -10,10 +10,12 @@
   font-size: 12px;
   font-weight: normal;
   color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  opacity: 0.7;
 }
+/* Nested opacity multiplies: the numbers end up at about 0.45. */
 .ghdf-orig > span {
   font-weight: normal;
-  opacity: 0.75;
+  opacity: 0.65;
 }
 .ghdf-error {
   margin-left: 4px;
