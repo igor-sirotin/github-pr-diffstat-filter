@@ -2,7 +2,7 @@
   const ext = globalThis.browser ?? globalThis.chrome;
   const core = globalThis.DiffstatCore;
   const BADGE_CLASS = 'ghdf-badge';
-  const SHADED_CLASS = 'ghdf-shaded';
+  const HIDDEN_CLASS = 'ghdf-hidden';
   const SUCCESS = '.fgColor-success, .color-fg-success';
   const DANGER = '.fgColor-danger, .color-fg-danger';
   const PULL_TTL_MS = 30_000;
@@ -82,6 +82,7 @@
   function findDiffstatPairs() {
     const pairs = [];
     for (const add of document.querySelectorAll(SUCCESS)) {
+      if (add.closest(`.${BADGE_CLASS}`)) continue;
       const del = add.nextElementSibling;
       if (!del || !del.matches(DANGER)) continue;
       if (!/^\s*\+/.test(add.textContent)) continue;
@@ -105,25 +106,43 @@
     return lines.join('\n');
   }
 
+  function excludedLabel(files) {
+    if (files.length > 2) return `${files.length} excluded files`;
+    return files.map((f) => f.filename.split('/').pop()).join(', ');
+  }
+
+  function countSpan(like, text) {
+    const span = document.createElement('span');
+    span.className = like.className;
+    span.classList.remove(HIDDEN_CLASS);
+    span.textContent = text;
+    return span;
+  }
+
+  // Takes the place of GitHub's own numbers (which get hidden) and keeps them in brackets:
+  //   +71 −211 (with flake.lock, Cargo.lock: +25,202 −56,795)
   function renderBadge(pair, stats) {
     const badge = document.createElement('span');
     badge.className = BADGE_CLASS;
     badge.title = tooltip(stats);
 
-    const minus = pair.del.textContent.trim()[0] === '-' ? '-' : '−';
-    const add = document.createElement('span');
-    add.className = pair.add.className;
-    add.classList.remove(SHADED_CLASS);
-    add.textContent = `+${fmt(stats.filtered.additions)}`;
-    const del = document.createElement('span');
-    del.className = pair.del.className;
-    del.classList.remove(SHADED_CLASS);
-    del.textContent = `${minus}${fmt(stats.filtered.deletions)}`;
-    const label = document.createElement('span');
-    label.className = 'ghdf-label';
-    label.textContent = `w/o ${stats.excluded.files.length === 1 ? stats.excluded.files[0].filename.split('/').pop() : `${stats.excluded.files.length} files`}`;
-
-    badge.append('(', add, ' ', del, ' ', label, ')');
+    const minus = pair.del.textContent.trim()[0] === '-' ? '-' : '\u2212';
+    const orig = document.createElement('span');
+    orig.className = 'ghdf-orig';
+    orig.append(
+      `(with ${excludedLabel(stats.excluded.files)}: `,
+      countSpan(pair.add, `+${fmt(stats.total.additions)}`),
+      ' ',
+      countSpan(pair.del, `${minus}${fmt(stats.total.deletions)}`),
+      ')',
+    );
+    badge.append(
+      countSpan(pair.add, `+${fmt(stats.filtered.additions)}`),
+      ' ',
+      countSpan(pair.del, `${minus}${fmt(stats.filtered.deletions)}`),
+      ' ',
+      orig,
+    );
     return badge;
   }
 
@@ -145,10 +164,10 @@
     }
   }
 
-  // Dims GitHub's own numbers while the filtered ones are shown next to them.
-  function setShaded(pair, on) {
-    pair.add.classList.toggle(SHADED_CLASS, on);
-    pair.del.classList.toggle(SHADED_CLASS, on);
+  // Hides GitHub's own numbers while the badge shows the filtered ones in their place.
+  function setHidden(pair, on) {
+    pair.add.classList.toggle(HIDDEN_CLASS, on);
+    pair.del.classList.toggle(HIDDEN_CLASS, on);
   }
 
   let generation = 0;
@@ -167,6 +186,7 @@
       if (gen !== generation) return;
       // Show the warning next to the biggest pair only (that is the PR total).
       const top = pairs.reduce((a, b) => (b.additions + b.deletions > a.additions + a.deletions ? b : a));
+      setHidden(top, false);
       placeBadge(top, renderError(e.message || String(e)));
       return;
     }
@@ -177,9 +197,9 @@
       if (pair.additions !== stats.total.additions || pair.deletions !== stats.total.deletions) continue;
       if (stats.relevant) {
         placeBadge(pair, renderBadge(pair, stats));
-        setShaded(pair, true);
+        setHidden(pair, true);
       } else {
-        setShaded(pair, false);
+        setHidden(pair, false);
         const existing = pair.del.nextElementSibling;
         if (existing && existing.classList.contains(BADGE_CLASS)) existing.remove();
       }
@@ -207,7 +227,7 @@
     pullCache.clear();
     filesCache.clear();
     document.querySelectorAll(`.${BADGE_CLASS}`).forEach((b) => b.remove());
-    document.querySelectorAll(`.${SHADED_CLASS}`).forEach((e) => e.classList.remove(SHADED_CLASS));
+    document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((e) => e.classList.remove(HIDDEN_CLASS));
     await loadSettings();
     schedule();
   });

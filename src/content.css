@@ -1,20 +1,21 @@
+.ghdf-hidden {
+  display: none !important;
+}
 .ghdf-badge {
-  margin-left: 4px;
-  font-size: 12px;
-  font-weight: normal;
-  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
   white-space: nowrap;
   cursor: help;
 }
-.ghdf-badge > span {
-  font-weight: 600;
-}
-.ghdf-badge > .ghdf-label {
+.ghdf-orig {
+  margin-left: 2px;
+  font-size: 12px;
   font-weight: normal;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+}
+.ghdf-orig > span {
+  font-weight: normal;
+  opacity: 0.75;
 }
 .ghdf-error {
+  margin-left: 4px;
   color: var(--fgColor-attention, var(--color-attention-fg, #9a6700));
-}
-.ghdf-shaded {
-  opacity: 0.45;
 }

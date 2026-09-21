@@ -1,15 +1,16 @@
 # GitHub PR Diffstat Filter
 
-A browser extension (Chrome/Chromium and Firefox, Manifest V3) that adds a second diffstat next to
-GitHub's PR line counts. The second count leaves out files that match your patterns, such as lockfiles:
+A browser extension (Chrome/Chromium and Firefox, Manifest V3) that replaces GitHub's PR line
+counts with counts that leave out files matching your patterns, such as lockfiles. The original
+counts stay next to them in brackets:
 
 ```
-+25,202 −56,795 (+71 −211 w/o 2 files)
++71 −211 (with flake.lock, Cargo.lock: +25,202 −56,795)
 ```
 
-GitHub's own numbers are dimmed while the filtered count is shown.
-Hover over the added part to see which files were excluded and their line counts. The extra count
-appears only when at least one file matches **and** at least one doesn't, so a PR that only
+The filtered numbers go exactly where GitHub's were, so the header layout barely changes.
+Hover over the numbers to see which files were excluded and their line counts. The filtered numbers
+appear only when at least one file matches **and** at least one doesn't, so a PR that only
 bumps `flake.lock` keeps GitHub's plain numbers.
 
 It works in the PR header on every PR tab (conversation, commits, checks) and in the classic
