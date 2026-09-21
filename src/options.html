@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PR Diffstat Filter options</title>
+  <style>
+    :root { color-scheme: light dark; --muted: #59636e; --ok: #1a7f37; --bad: #d1242f; }
+    @media (prefers-color-scheme: dark) { :root { --muted: #9198a1; --ok: #3fb950; --bad: #f85149; } }
+    body { font: 14px/1.5 system-ui, sans-serif; max-width: 640px; margin: 16px; }
+    h2 { font-size: 15px; margin: 20px 0 4px; }
+    p.hint { color: var(--muted); margin: 4px 0 8px; font-size: 13px; }
+    textarea, input[type=password] { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: 6px; }
+    textarea { height: 260px; }
+    .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    #status, #token-status { font-size: 13px; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+  </style>
+</head>
+<body>
+  <h2>Excluded paths</h2>
+  <p class="hint">
+    The PR diffstat also shows the line counts without files that match these patterns,
+    unless every changed file matches. One gitignore-style pattern per line; lines starting with <code>#</code> are ignored.
+  </p>
+  <textarea id="patterns" spellcheck="false"></textarea>
+
+  <h2>GitHub token (optional)</h2>
+  <p class="hint">
+    Without a token the GitHub API allows 60 requests per hour and only public repositories.
+    A fine-grained token with <em>Public repositories (read-only)</em> access, or with
+    <em>Pull requests: Read-only</em> on the private repositories you need, is enough.
+    It is stored locally in this browser and not synced.
+  </p>
+  <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+  <div class="row">
+    <button id="check">Check token</button>
+    <span id="token-status"></span>
+  </div>
+
+  <div class="row">
+    <button id="save">Save</button>
+    <button id="reset">Restore default patterns</button>
+    <span id="status"></span>
+  </div>
+
+  <script src="core.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

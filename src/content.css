@@ -1,0 +1,17 @@
+.ghdf-badge {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  white-space: nowrap;
+  cursor: help;
+}
+.ghdf-badge > span {
+  font-weight: 600;
+}
+.ghdf-badge > .ghdf-label {
+  font-weight: normal;
+}
+.ghdf-error {
+  color: var(--fgColor-attention, var(--color-attention-fg, #9a6700));
+}
