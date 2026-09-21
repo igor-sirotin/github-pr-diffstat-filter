@@ -2,6 +2,7 @@
   const ext = globalThis.browser ?? globalThis.chrome;
   const core = globalThis.DiffstatCore;
   const BADGE_CLASS = 'ghdf-badge';
+  const SHADED_CLASS = 'ghdf-shaded';
   const SUCCESS = '.fgColor-success, .color-fg-success';
   const DANGER = '.fgColor-danger, .color-fg-danger';
   const PULL_TTL_MS = 30_000;
@@ -112,9 +113,11 @@
     const minus = pair.del.textContent.trim()[0] === '-' ? '-' : '−';
     const add = document.createElement('span');
     add.className = pair.add.className;
+    add.classList.remove(SHADED_CLASS);
     add.textContent = `+${fmt(stats.filtered.additions)}`;
     const del = document.createElement('span');
     del.className = pair.del.className;
+    del.classList.remove(SHADED_CLASS);
     del.textContent = `${minus}${fmt(stats.filtered.deletions)}`;
     const label = document.createElement('span');
     label.className = 'ghdf-label';
@@ -140,6 +143,12 @@
     } else {
       pair.del.after(badge);
     }
+  }
+
+  // Dims GitHub's own numbers while the filtered ones are shown next to them.
+  function setShaded(pair, on) {
+    pair.add.classList.toggle(SHADED_CLASS, on);
+    pair.del.classList.toggle(SHADED_CLASS, on);
   }
 
   let generation = 0;
@@ -168,7 +177,9 @@
       if (pair.additions !== stats.total.additions || pair.deletions !== stats.total.deletions) continue;
       if (stats.relevant) {
         placeBadge(pair, renderBadge(pair, stats));
+        setShaded(pair, true);
       } else {
+        setShaded(pair, false);
         const existing = pair.del.nextElementSibling;
         if (existing && existing.classList.contains(BADGE_CLASS)) existing.remove();
       }
@@ -196,6 +207,7 @@
     pullCache.clear();
     filesCache.clear();
     document.querySelectorAll(`.${BADGE_CLASS}`).forEach((b) => b.remove());
+    document.querySelectorAll(`.${SHADED_CLASS}`).forEach((e) => e.classList.remove(SHADED_CLASS));
     await loadSettings();
     schedule();
   });

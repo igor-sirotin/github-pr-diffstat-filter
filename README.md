@@ -7,6 +7,7 @@ GitHub's PR line counts. The second count leaves out files that match your patte
 +25,202 −56,795 (+71 −211 w/o 2 files)
 ```
 
+GitHub's own numbers are dimmed while the filtered count is shown.
 Hover over the added part to see which files were excluded and their line counts. The extra count
 appears only when at least one file matches **and** at least one doesn't, so a PR that only
 bumps `flake.lock` keeps GitHub's plain numbers.

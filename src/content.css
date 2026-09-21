@@ -15,3 +15,6 @@
 .ghdf-error {
   color: var(--fgColor-attention, var(--color-attention-fg, #9a6700));
 }
+.ghdf-shaded {
+  opacity: 0.45;
+}
