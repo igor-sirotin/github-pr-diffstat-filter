@@ -76,6 +76,72 @@ test('truncated file lists count unseen files as kept', () => {
   assert.deepStrictEqual(s.filtered, { additions: 10, deletions: 10 });
 });
 
+const reviewFiles = [
+  { filename: 'flake.lock', additions: 25130, deletions: 56583 },
+  { filename: 'src/main.cpp', additions: 70, deletions: 200 },
+  { filename: 'README.md', additions: 2, deletions: 12 },
+];
+const reviewPr = { additions: 25202, deletions: 56795, changed_files: 3 };
+
+test('review is null when viewed state is unknown or nothing kept is viewed', () => {
+  const ms = m(core.DEFAULT_PATTERNS);
+  assert.strictEqual(core.computeStats(reviewPr, reviewFiles, ms).review, null);
+  assert.strictEqual(core.computeStats(reviewPr, reviewFiles, ms, new Set()).review, null);
+  // A viewed lockfile is already excluded, so it does not count as review progress.
+  assert.strictEqual(core.computeStats(reviewPr, reviewFiles, ms, new Set(['flake.lock'])).review, null);
+});
+
+test('viewed files are subtracted from the filtered numbers', () => {
+  const s = core.computeStats(reviewPr, reviewFiles, m(core.DEFAULT_PATTERNS), new Set(['flake.lock', 'README.md']));
+  assert.deepStrictEqual(s.filtered, { additions: 72, deletions: 212 });
+  assert.deepStrictEqual(s.review.left, { additions: 70, deletions: 200, files: 1 });
+  assert.deepStrictEqual(s.review.viewedFiles.map((f) => f.filename), ['README.md']);
+  assert.strictEqual(s.review.totalFiles, 2);
+  assert.strictEqual(s.review.done, false);
+  assert.strictEqual(s.review.progress, 14 / 284);
+});
+
+test('review is done when every kept file is viewed', () => {
+  const s = core.computeStats(reviewPr, reviewFiles, m(core.DEFAULT_PATTERNS), new Set(['src/main.cpp', 'README.md']));
+  assert.deepStrictEqual(s.review.left, { additions: 0, deletions: 0, files: 0 });
+  assert.strictEqual(s.review.done, true);
+  assert.strictEqual(s.review.progress, 1);
+});
+
+test('without a shown filter, review is measured against the PR totals', () => {
+  const s = core.computeStats(reviewPr, reviewFiles, [], new Set(['flake.lock']));
+  assert.strictEqual(s.relevant, false);
+  assert.deepStrictEqual(s.review.left, { additions: 72, deletions: 212, files: 2 });
+  // Also when every file matches the patterns and the filter is therefore not shown.
+  const pr = { additions: 10, deletions: 5, changed_files: 2 };
+  const locks = [
+    { filename: 'flake.lock', additions: 5, deletions: 5 },
+    { filename: 'Cargo.lock', additions: 5, deletions: 0 },
+  ];
+  const t = core.computeStats(pr, locks, m(core.DEFAULT_PATTERNS), new Set(['Cargo.lock']));
+  assert.deepStrictEqual(t.review.left, { additions: 5, deletions: 5, files: 1 });
+});
+
+test('unseen files of a truncated listing count as not viewed', () => {
+  const pr = { additions: 100, deletions: 100, changed_files: 5 };
+  const files = [
+    { filename: 'flake.lock', additions: 90, deletions: 90 },
+    { filename: 'a.rs', additions: 4, deletions: 6 },
+  ];
+  const s = core.computeStats(pr, files, m('flake.lock'), new Set(['a.rs']));
+  assert.deepStrictEqual(s.review.left, { additions: 6, deletions: 4, files: 3 });
+  assert.strictEqual(s.review.done, false);
+});
+
+test('progress falls back to file counts when no lines changed', () => {
+  const pr = { additions: 0, deletions: 0, changed_files: 2 };
+  const files = [
+    { filename: 'a.png', additions: 0, deletions: 0 },
+    { filename: 'b.png', additions: 0, deletions: 0 },
+  ];
+  assert.strictEqual(core.computeStats(pr, files, [], new Set(['a.png'])).review.progress, 0.5);
+});
+
 test('parseCount and parsePullUrl', () => {
   assert.strictEqual(core.parseCount('+25,202'), 25202);
   assert.strictEqual(core.parseCount('\n  −56,795 '), 56795);

@@ -17,6 +17,39 @@
   font-weight: normal;
   opacity: 0.65;
 }
+.ghdf-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 0 7px 0 5px;
+  border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 18px;
+  vertical-align: middle;
+  color: var(--fgColor-muted, var(--color-fg-muted, #59636e));
+}
+.ghdf-review > span {
+  font-weight: 600;
+}
+.ghdf-review-done {
+  padding: 0 7px;
+  border-color: var(--borderColor-success-muted, var(--color-success-muted, #4ac26b66));
+  color: var(--fgColor-success, var(--color-success-fg, #1a7f37));
+}
+/* A pie that fills clockwise with the share of lines already viewed. */
+.ghdf-pie {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--fgColor-muted, var(--color-fg-muted, #59636e));
+  background: conic-gradient(
+    var(--fgColor-muted, var(--color-fg-muted, #59636e)) var(--ghdf-progress, 0%),
+    transparent 0
+  );
+}
 .ghdf-error {
   margin-left: 4px;
   color: var(--fgColor-attention, var(--color-attention-fg, #9a6700));

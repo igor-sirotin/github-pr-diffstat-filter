@@ -73,33 +73,66 @@
   }
 
   // pr: { additions, deletions, changed_files }, files: [{ filename, additions, deletions }]
-  function computeStats(pr, files, matchers) {
+  // viewed: optional Set of paths the viewer has marked as "Viewed" (null when unknown).
+  function computeStats(pr, files, matchers, viewed) {
     const excluded = { additions: 0, deletions: 0, files: [] };
-    let keptFiles = 0;
+    const kept = [];
     for (const f of files) {
+      const entry = { filename: f.filename, additions: f.additions, deletions: f.deletions };
       if (isExcluded(f.filename, matchers)) {
         excluded.additions += f.additions;
         excluded.deletions += f.deletions;
-        excluded.files.push({ filename: f.filename, additions: f.additions, deletions: f.deletions });
+        excluded.files.push(entry);
       } else {
-        keptFiles++;
+        kept.push(entry);
       }
     }
+    const keptFiles = kept.length;
     // The files endpoint lists at most 3000 files; subtracting from the PR totals
     // keeps the result right for the files we did not see (they count as kept).
     const truncated = files.length < pr.changed_files;
     const unseen = Math.max(0, pr.changed_files - files.length);
+    const filtered = {
+      additions: pr.additions - excluded.additions,
+      deletions: pr.deletions - excluded.deletions,
+    };
+    // Nothing worth showing: no file matched, or every file matched.
+    const relevant = excluded.files.length > 0 && keptFiles + unseen > 0;
     return {
       total: { additions: pr.additions, deletions: pr.deletions },
       excluded,
-      filtered: {
-        additions: pr.additions - excluded.additions,
-        deletions: pr.deletions - excluded.deletions,
-      },
+      filtered,
       keptFiles: keptFiles + unseen,
       truncated,
-      // Nothing worth showing: no file matched, or every file matched.
-      relevant: excluded.files.length > 0 && keptFiles + unseen > 0,
+      relevant,
+      // What is left to review is measured against the numbers on display: the filtered
+      // ones when the filter applies, otherwise the PR totals.
+      review: viewed
+        ? computeReview(relevant ? filtered : pr, relevant ? kept : kept.concat(excluded.files), unseen, viewed)
+        : null,
+    };
+  }
+
+  // base: { additions, deletions } of the files under review; unseen files count as not viewed.
+  // Returns null when none of the files is viewed, so there is nothing to add to the diffstat.
+  function computeReview(base, files, unseen, viewed) {
+    const viewedFiles = files.filter((f) => viewed.has(f.filename));
+    if (viewedFiles.length === 0) return null;
+    const sum = (key) => viewedFiles.reduce((n, f) => n + f[key], 0);
+    const totalFiles = files.length + unseen;
+    const left = {
+      additions: base.additions - sum('additions'),
+      deletions: base.deletions - sum('deletions'),
+      files: totalFiles - viewedFiles.length,
+    };
+    const lines = base.additions + base.deletions;
+    return {
+      viewedFiles,
+      totalFiles,
+      left,
+      done: left.files === 0,
+      // Share of the work already viewed, by lines (by files when there are no lines, e.g. renames).
+      progress: lines > 0 ? (lines - left.additions - left.deletions) / lines : viewedFiles.length / totalFiles,
     };
   }
 

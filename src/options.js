@@ -8,14 +8,15 @@ function flash(el, text, cls) {
 }
 
 async function load() {
-  const { patterns } = await ext.storage.sync.get({ patterns: core.DEFAULT_PATTERNS });
+  const { patterns, showViewed } = await ext.storage.sync.get({ patterns: core.DEFAULT_PATTERNS, showViewed: true });
   const { token } = await ext.storage.local.get({ token: '' });
+  $('show-viewed').checked = showViewed;
   $('patterns').value = patterns;
   $('token').value = token;
 }
 
 $('save').addEventListener('click', async () => {
-  await ext.storage.sync.set({ patterns: $('patterns').value });
+  await ext.storage.sync.set({ patterns: $('patterns').value, showViewed: $('show-viewed').checked });
   await ext.storage.local.set({ token: $('token').value.trim() });
   flash($('status'), `Saved (${core.parsePatterns($('patterns').value).length} patterns).`, 'ok');
 });

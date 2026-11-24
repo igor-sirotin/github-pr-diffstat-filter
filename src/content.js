@@ -10,13 +10,18 @@
   let settings = null; // { matchers, token }
   const pullCache = new Map(); // "o/r#n" -> { at, promise }
   const filesCache = new Map(); // "o/r#n@sha" -> promise<files>
+  const viewedCache = new Map(); // "o/r#n" -> { at, promise<Set<path> | null> }
 
   async function loadSettings() {
     const [sync, local] = await Promise.all([
-      ext.storage.sync.get({ patterns: core.DEFAULT_PATTERNS }),
+      ext.storage.sync.get({ patterns: core.DEFAULT_PATTERNS, showViewed: true }),
       ext.storage.local.get({ token: '' }),
     ]);
-    settings = { matchers: core.parsePatterns(sync.patterns), token: local.token.trim() };
+    settings = {
+      matchers: core.parsePatterns(sync.patterns),
+      token: local.token.trim(),
+      showViewed: sync.showViewed,
+    };
   }
 
   class ApiError extends Error {
@@ -72,10 +77,58 @@
     return filesCache.get(key);
   }
 
+  const VIEWED_QUERY = `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $number) {
+        files(first: 100, after: $after) {
+          pageInfo { hasNextPage endCursor }
+          nodes { path viewerViewedState }
+        }
+      }
+    }
+  }`;
+
+  async function fetchViewed({ owner, repo, number }) {
+    const viewed = new Set();
+    let after = null;
+    // Same 3000-file ceiling as the REST listing.
+    for (let page = 0; page < 30; page++) {
+      const res = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${settings.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: VIEWED_QUERY, variables: { owner, repo, number, after } }),
+      });
+      const body = res.ok ? await res.json() : null;
+      const files = body?.data?.repository?.pullRequest?.files;
+      if (!files) throw new Error(body?.errors?.[0]?.message || `GitHub GraphQL API responded ${res.status}`);
+      // DISMISSED means the file changed after it was viewed, so it needs another look.
+      for (const f of files.nodes) if (f.viewerViewedState === 'VIEWED') viewed.add(f.path);
+      if (!files.pageInfo.hasNextPage) break;
+      after = files.pageInfo.endCursor;
+    }
+    return viewed;
+  }
+
+  // "Viewed" marks belong to the token's user and are only exposed by the GraphQL API, which
+  // needs a token. Resolves to null when they are unavailable; the rest of the badge still works.
+  function getViewed(pr) {
+    if (!settings.showViewed || !settings.token) return Promise.resolve(null);
+    const key = `${pr.owner}/${pr.repo}#${pr.number}`;
+    const hit = viewedCache.get(key);
+    if (hit && Date.now() - hit.at < PULL_TTL_MS) return hit.promise;
+    const promise = fetchViewed(pr).catch((e) => {
+      console.debug('PR diffstat filter: could not load viewed files:', e.message);
+      return null;
+    });
+    viewedCache.set(key, { at: Date.now(), promise });
+    return promise;
+  }
+
   async function getStats(pr) {
+    const viewedPromise = getViewed(pr);
     const pull = await getPull(pr);
-    const files = await getFiles(pr, pull);
-    return core.computeStats(pull, files, settings.matchers);
+    const [files, viewed] = await Promise.all([getFiles(pr, pull), viewedPromise]);
+    return core.computeStats(pull, files, settings.matchers, viewed);
   }
 
   // Finds "+N" / "−M" sibling pairs, as used by both the React PR header and the classic #diffstat.
@@ -119,14 +172,56 @@
     return span;
   }
 
-  // Takes the place of GitHub's own numbers (which get hidden) and keeps them in brackets:
+  function reviewTooltip(review) {
+    const n = review.viewedFiles.length;
+    const lines = [`You marked ${n} of ${review.totalFiles} file(s) as viewed:`];
+    const shown = review.viewedFiles.slice(0, 25);
+    for (const f of shown) lines.push(`  ${f.filename}  +${fmt(f.additions)} −${fmt(f.deletions)}`);
+    if (n > shown.length) lines.push(`  …and ${n - shown.length} more`);
+    lines.push('', review.done
+      ? 'Nothing left to review.'
+      : `Left to review: +${fmt(review.left.additions)} −${fmt(review.left.deletions)} in ${review.left.files} file(s)`);
+    return lines.join('\n');
+  }
+
+  // A pill with what is still unviewed, and a pie that fills up as files get viewed:
+  //   ◔ +30 −12 left        or, once everything is viewed:   ✓ viewed
+  function renderReview(pair, review, minus) {
+    const pill = document.createElement('span');
+    pill.className = 'ghdf-review';
+    pill.title = reviewTooltip(review);
+    if (review.done) {
+      pill.classList.add('ghdf-review-done');
+      pill.textContent = '✓ viewed';
+      return pill;
+    }
+    const pie = document.createElement('span');
+    pie.className = 'ghdf-pie';
+    pie.style.setProperty('--ghdf-progress', `${Math.round(review.progress * 100)}%`);
+    pill.append(
+      pie,
+      countSpan(pair.add, `+${fmt(review.left.additions)}`),
+      ' ',
+      countSpan(pair.del, `${minus}${fmt(review.left.deletions)}`),
+      ' left',
+    );
+    return pill;
+  }
+
+  // Once some files are marked as viewed, a pill with what is left to review follows. When no
+  // file is excluded, the badge is just that pill, next to GitHub's untouched numbers.
+  // Otherwise it takes the place of GitHub's numbers (which get hidden) and keeps them in brackets:
   //   +71 −211 (with flake.lock, Cargo.lock: +25,202 −56,795)
   function renderBadge(pair, stats) {
     const badge = document.createElement('span');
     badge.className = BADGE_CLASS;
-    badge.title = tooltip(stats);
+    if (stats.relevant) badge.title = tooltip(stats);
 
     const minus = pair.del.textContent.trim()[0] === '-' ? '-' : '\u2212';
+    if (!stats.relevant) {
+      badge.append(renderReview(pair, stats.review, minus));
+      return badge;
+    }
     const orig = document.createElement('span');
     orig.className = 'ghdf-orig';
     orig.append(
@@ -143,6 +238,7 @@
       ' ',
       orig,
     );
+    if (stats.review) badge.append(' ', renderReview(pair, stats.review, minus));
     return badge;
   }
 
@@ -195,9 +291,9 @@
     for (const pair of pairs) {
       // Only the PR-wide diffstat is annotated; per-file stats never equal the totals.
       if (pair.additions !== stats.total.additions || pair.deletions !== stats.total.deletions) continue;
-      if (stats.relevant) {
+      if (stats.relevant || stats.review) {
         placeBadge(pair, renderBadge(pair, stats));
-        setHidden(pair, true);
+        setHidden(pair, stats.relevant);
       } else {
         setHidden(pair, false);
         const existing = pair.del.nextElementSibling;
@@ -223,9 +319,25 @@
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 
+  // Ticking "Viewed" on the files tab changes what is left. GitHub saves the mark in the
+  // background, so ask again shortly after, and once more in case the save was slow.
+  document.addEventListener('click', (e) => {
+    const control = e.target.closest?.('button, label, input');
+    if (!control || !core.parsePullUrl(location.pathname)) return;
+    const label = (control.getAttribute('aria-label') || control.textContent || '').trim();
+    if (!control.matches('.js-reviewed-checkbox') && !/^(not )?viewed$/i.test(label)) return;
+    for (const delay of [800, 3000]) {
+      setTimeout(() => {
+        viewedCache.clear();
+        schedule();
+      }, delay);
+    }
+  }, true);
+
   ext.storage.onChanged.addListener(async () => {
     pullCache.clear();
     filesCache.clear();
+    viewedCache.clear();
     document.querySelectorAll(`.${BADGE_CLASS}`).forEach((b) => b.remove());
     document.querySelectorAll(`.${HIDDEN_CLASS}`).forEach((e) => e.classList.remove(HIDDEN_CLASS));
     await loadSettings();
