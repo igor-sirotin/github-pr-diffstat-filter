@@ -24,6 +24,13 @@
   </p>
   <textarea id="patterns" spellcheck="false"></textarea>
 
+  <h2>Left to review</h2>
+  <label><input type="checkbox" id="show-viewed"> Also show the line counts without the files I marked as <em>Viewed</em></label>
+  <p class="hint">
+    Appears once you mark a file as viewed in a PR. GitHub only tells which files you viewed
+    to a token of your own account, so this needs the token below.
+  </p>
+
   <h2>GitHub token (optional)</h2>
   <p class="hint">
     Without a token the GitHub API allows 60 requests per hour and only public repositories.

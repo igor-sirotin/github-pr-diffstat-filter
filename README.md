@@ -13,6 +13,13 @@ Hover over the numbers to see which files were excluded and their line counts. T
 appear only when at least one file matches **and** at least one doesn't, so a PR that only
 bumps `flake.lock` keeps GitHub's plain numbers.
 
+Once you mark files as *Viewed*, a pill next to the diffstat shows what is left to review: the
+line counts without the viewed files, and a pie that fills up with the share of lines you have
+been through. It turns into a green *✓ viewed* when nothing is left. Hover over it to see the
+viewed files. This needs a token (see below).
+
+![The diffstat with the left-to-review pill at different stages of a review](docs/left-to-review.png)
+
 It works in the PR header on every PR tab (conversation, commits, checks) and in the classic
 "Files changed" diffstat.
 
@@ -52,6 +59,12 @@ access:
 - public repos only: *Repository access → Public repositories*, no permissions needed;
 - private repos: select them and grant *Pull requests: Read-only*.
 
+**Left to review**: on by default, and can be switched off. Which files you marked as viewed is
+only available from GitHub's GraphQL API, which always needs a token, and it is the token
+owner's marks that are shown, so use a token of your own account. This adds one GraphQL request
+per 100 files on each PR view. Files that match the excluded patterns are left out of the pill
+as well, viewed or not. A file that changed after you viewed it counts as not viewed, as on GitHub.
+
 The token lives in `storage.local` (never synced) and is only sent to `api.github.com`.
 
 ## Notes
@@ -72,5 +85,6 @@ The token lives in `storage.local` (never synced) and is only sent to `api.githu
 npm install        # Playwright, only needed for the e2e check
 npm test           # unit tests for pattern matching and the arithmetic
 GH_TOKEN=... npm run e2e -- https://github.com/logos-co/logos-chat-module/pull/76
+VIEWED=README.md,src/a.rs GH_TOKEN=... npm run e2e -- <pr-url>   # pretend these files are viewed
 npm run package    # zip for store upload
 ```

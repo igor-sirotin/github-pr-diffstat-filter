@@ -19,6 +19,20 @@ const ctx = await chromium.launchPersistentContext(mkdtempSync(path.join(tmpdir(
   viewport: { width: 1400, height: 900 },
 });
 
+// VIEWED=path1,path2 answers the "viewed files" query as if exactly those files were marked as
+// viewed (VIEWED=* for all of them), so the pill can be checked without touching real review state.
+if (process.env.VIEWED !== undefined) {
+  const viewed = process.env.VIEWED.split(',').map((s) => s.trim());
+  await ctx.route('https://api.github.com/graphql', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    for (const f of body.data?.repository?.pullRequest?.files?.nodes ?? []) {
+      f.viewerViewedState = viewed.includes('*') || viewed.includes(f.path) ? 'VIEWED' : 'UNVIEWED';
+    }
+    await route.fulfill({ response: res, json: body });
+  });
+}
+
 const opts = await ctx.newPage();
 await opts.goto(`chrome-extension://${extId}/src/options.html`);
 await opts.fill('#token', process.env.GH_TOKEN || '');
