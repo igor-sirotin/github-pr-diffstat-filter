@@ -12,9 +12,13 @@
       "run_at": "document_idle"
     }
   ],
+  "action": {
+    "default_title": "PR Diffstat Filter options",
+    "default_popup": "src/options.html"
+  },
   "options_ui": {
     "page": "src/options.html",
-    "open_in_tab": true
+    "open_in_tab": false
   },
   "browser_specific_settings": {
     "gecko": {

@@ -33,7 +33,8 @@ Firefox (121+):
    This install is removed when Firefox restarts. For a permanent install, sign the add-on
    through addons.mozilla.org (it can stay unlisted), e.g. with `web-ext sign`.
 
-Then open the extension's options to adjust the patterns and, optionally, add a token.
+Then click the extension's toolbar icon to adjust the patterns and, optionally, add a token.
+The options open as a popup (pin the icon from the extensions menu to keep it in the toolbar).
 
 ## Options
 
