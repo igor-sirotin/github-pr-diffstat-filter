@@ -9,7 +9,12 @@
     body { font: 14px/1.5 system-ui, sans-serif; max-width: 640px; margin: 16px; }
     h2 { font-size: 15px; margin: 20px 0 4px; }
     p.hint { color: var(--muted); margin: 4px 0 8px; font-size: 13px; }
-    textarea, input[type=password] { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: 6px; }
+    textarea, input[type=password], input[type=text] { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: 6px; }
+    .owner-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .owner-row .owner { flex: 0 0 180px; }
+    .owner-row .token { flex: 1 1 auto; min-width: 0; }
+    .owner-row button { flex: none; }
+    #token-status { white-space: pre-line; }
     textarea { height: 260px; }
     .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
     #status, #token-status { font-size: 13px; }
@@ -39,8 +44,19 @@
     It is stored locally in this browser and not synced.
   </p>
   <input type="password" id="token" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+
+  <h2>Tokens for specific organizations (optional)</h2>
+  <p class="hint">
+    A fine-grained token only reaches the repositories of one owner. Add a token per organization
+    or user name here; it is used for pull requests in that owner's repositories, and the token
+    above for everything else. These are stored locally as well.
+  </p>
+  <div id="owner-tokens"></div>
   <div class="row">
-    <button id="check">Check token</button>
+    <button id="add-owner">Add organization</button>
+    <button id="check">Check tokens</button>
+  </div>
+  <div class="row">
     <span id="token-status"></span>
   </div>
 

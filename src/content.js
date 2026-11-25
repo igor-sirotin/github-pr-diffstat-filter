@@ -7,7 +7,7 @@
   const DANGER = '.fgColor-danger, .color-fg-danger';
   const PULL_TTL_MS = 30_000;
 
-  let settings = null; // { matchers, token }
+  let settings = null; // { matchers, token, ownerTokens, showViewed }
   const pullCache = new Map(); // "o/r#n" -> { at, promise }
   const filesCache = new Map(); // "o/r#n@sha" -> promise<files>
   const viewedCache = new Map(); // "o/r#n" -> { at, promise<Set<path> | null> }
@@ -15,14 +15,18 @@
   async function loadSettings() {
     const [sync, local] = await Promise.all([
       ext.storage.sync.get({ patterns: core.DEFAULT_PATTERNS, showViewed: true }),
-      ext.storage.local.get({ token: '' }),
+      ext.storage.local.get({ token: '', ownerTokens: [] }),
     ]);
     settings = {
       matchers: core.parsePatterns(sync.patterns),
       token: local.token.trim(),
+      ownerTokens: core.parseOwnerTokens(local.ownerTokens),
       showViewed: sync.showViewed,
     };
   }
+
+  // An owner (organization or user) can have its own token; the default one covers the rest.
+  const tokenFor = (owner) => core.tokenFor(owner, settings.token, settings.ownerTokens);
 
   class ApiError extends Error {
     constructor(status, message) {
@@ -31,22 +35,25 @@
     }
   }
 
-  async function gh(path) {
+  async function gh(owner, path) {
+    const token = tokenFor(owner);
     const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
-    if (settings.token) headers.Authorization = `Bearer ${settings.token}`;
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`https://api.github.com${path}`, { headers });
     if (res.ok) return res.json();
 
+    // Says which of the configured tokens was used, so the right one gets fixed.
+    const which = token === settings.token ? 'The default token' : `The token for ${owner}`;
     let message = `GitHub API responded ${res.status}`;
     if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') {
-      message = settings.token
-        ? 'GitHub API rate limit exceeded for this token.'
+      message = token
+        ? `GitHub API rate limit exceeded. ${which} was used.`
         : 'GitHub API rate limit exceeded (60 requests/hour without a token). Add a token in the extension options.';
     } else if (res.status === 401) {
-      message = 'The token was rejected by GitHub (401). Check it in the extension options.';
+      message = `${which} was rejected by GitHub (401). Check it in the extension options.`;
     } else if (res.status === 404) {
-      message = settings.token
-        ? 'PR not found through the API. Does the token have access to this repository?'
+      message = token
+        ? `PR not found through the API. ${which} was used: does it have access to this repository?`
         : 'PR not found through the API. For private repositories, add a token in the extension options.';
     }
     throw new ApiError(res.status, message);
@@ -56,7 +63,7 @@
     const key = `${owner}/${repo}#${number}`;
     const hit = pullCache.get(key);
     if (hit && Date.now() - hit.at < PULL_TTL_MS) return hit.promise;
-    const promise = gh(`/repos/${owner}/${repo}/pulls/${number}`);
+    const promise = gh(owner, `/repos/${owner}/${repo}/pulls/${number}`);
     pullCache.set(key, { at: Date.now(), promise });
     promise.catch(() => pullCache.delete(key));
     return promise;
@@ -69,7 +76,7 @@
       const pages = Math.max(1, Math.ceil(Math.min(pull.changed_files, 3000) / 100));
       const promise = Promise.all(
         Array.from({ length: pages }, (_, i) =>
-          gh(`/repos/${owner}/${repo}/pulls/${number}/files?per_page=100&page=${i + 1}`)),
+          gh(owner, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100&page=${i + 1}`)),
       ).then((chunks) => chunks.flat());
       filesCache.set(key, promise);
       promise.catch(() => filesCache.delete(key));
@@ -95,7 +102,7 @@
     for (let page = 0; page < 30; page++) {
       const res = await fetch('https://api.github.com/graphql', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${settings.token}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${tokenFor(owner)}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: VIEWED_QUERY, variables: { owner, repo, number, after } }),
       });
       const body = res.ok ? await res.json() : null;
@@ -112,7 +119,7 @@
   // "Viewed" marks belong to the token's user and are only exposed by the GraphQL API, which
   // needs a token. Resolves to null when they are unavailable; the rest of the badge still works.
   function getViewed(pr) {
-    if (!settings.showViewed || !settings.token) return Promise.resolve(null);
+    if (!settings.showViewed || !tokenFor(pr.owner)) return Promise.resolve(null);
     const key = `${pr.owner}/${pr.repo}#${pr.number}`;
     const hit = viewedCache.get(key);
     if (hit && Date.now() - hit.at < PULL_TTL_MS) return hit.promise;

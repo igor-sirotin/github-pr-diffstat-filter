@@ -147,7 +147,39 @@
     return m ? { owner: m[1], repo: m[2], number: Number(m[3]) } : null;
   }
 
-  const api = { DEFAULT_PATTERNS, globToRegExp, parsePatterns, isExcluded, computeStats, parseCount, parsePullUrl };
+  // Owner as typed in the options: "@Acme", "acme/" and "https://github.com/acme" all mean "acme".
+  function normalizeOwner(name) {
+    return String(name || '')
+      .trim()
+      .replace(/^(?:https?:\/\/)?github\.com\//i, '')
+      .replace(/^@/, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase();
+  }
+
+  // entries: [{ owner, token }] as stored. Returns { owner: token } with normalized owners;
+  // entries missing either part are dropped.
+  function parseOwnerTokens(entries) {
+    const map = {};
+    for (const e of Array.isArray(entries) ? entries : []) {
+      const owner = normalizeOwner(e && e.owner);
+      const token = String((e && e.token) || '').trim();
+      if (owner && token) map[owner] = token;
+    }
+    return map;
+  }
+
+  // The token for a repository owner: its own one if set, otherwise the default one.
+  function tokenFor(owner, defaultToken, ownerTokens) {
+    const key = normalizeOwner(owner);
+    const own = ownerTokens && Object.prototype.hasOwnProperty.call(ownerTokens, key) ? ownerTokens[key] : '';
+    return own || defaultToken || '';
+  }
+
+  const api = {
+    DEFAULT_PATTERNS, globToRegExp, parsePatterns, isExcluded, computeStats, parseCount, parsePullUrl,
+    normalizeOwner, parseOwnerTokens, tokenFor,
+  };
   root.DiffstatCore = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
