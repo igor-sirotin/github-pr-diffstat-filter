@@ -21,7 +21,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 4px;
+  margin-right: 6px;
   padding: 0 7px 0 5px;
   border: 1px solid var(--borderColor-default, var(--color-border-default, #d1d9e0));
   border-radius: 999px;
