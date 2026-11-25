@@ -153,3 +153,35 @@ test('parseCount and parsePullUrl', () => {
   assert.strictEqual(core.parsePullUrl('/o/r/pulls'), null);
   assert.strictEqual(core.parsePullUrl('/o/r/issues/1'), null);
 });
+
+test('normalizeOwner accepts the usual ways of writing an owner', () => {
+  for (const s of ['acme', ' Acme ', '@acme', 'acme/', 'acme/repo', 'https://github.com/Acme/repo', 'github.com/acme']) {
+    assert.strictEqual(core.normalizeOwner(s), 'acme', s);
+  }
+  assert.strictEqual(core.normalizeOwner(''), '');
+  assert.strictEqual(core.normalizeOwner(undefined), '');
+});
+
+test('parseOwnerTokens drops incomplete entries and normalizes owners', () => {
+  assert.deepStrictEqual(
+    core.parseOwnerTokens([
+      { owner: 'Acme', token: ' t1 ' },
+      { owner: '', token: 't2' },
+      { owner: 'other', token: '' },
+      null,
+    ]),
+    { acme: 't1' },
+  );
+  assert.deepStrictEqual(core.parseOwnerTokens(undefined), {});
+});
+
+test('tokenFor prefers the owner token and falls back to the default', () => {
+  const map = core.parseOwnerTokens([{ owner: 'acme', token: 'org' }]);
+  assert.strictEqual(core.tokenFor('ACME', 'def', map), 'org');
+  assert.strictEqual(core.tokenFor('someone', 'def', map), 'def');
+  assert.strictEqual(core.tokenFor('someone', '', map), '');
+  assert.strictEqual(core.tokenFor('acme', '', map), 'org');
+  // Owner names must not reach Object.prototype.
+  assert.strictEqual(core.tokenFor('constructor', 'def', {}), 'def');
+  assert.strictEqual(core.tokenFor('acme', 'def', undefined), 'def');
+});

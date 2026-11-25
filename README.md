@@ -59,13 +59,19 @@ access:
 - public repos only: *Repository access → Public repositories*, no permissions needed;
 - private repos: select them and grant *Pull requests: Read-only*.
 
+**Tokens for specific organizations**: optional. A fine-grained token is tied to one resource
+owner, so a single token cannot cover private repositories of several organizations. Add one
+token per organization (or user) name; it is used for every request about a PR in that owner's
+repositories, including the *left to review* marks, and the default token is used everywhere
+else. Names are matched case-insensitively. *Check tokens* tests all of them.
+
 **Left to review**: on by default, and can be switched off. Which files you marked as viewed is
 only available from GitHub's GraphQL API, which always needs a token, and it is the token
 owner's marks that are shown, so use a token of your own account. This adds one GraphQL request
 per 100 files on each PR view. Files that match the excluded patterns are left out of the pill
 as well, viewed or not. A file that changed after you viewed it counts as not viewed, as on GitHub.
 
-The token lives in `storage.local` (never synced) and is only sent to `api.github.com`.
+The tokens live in `storage.local` (never synced) and are only sent to `api.github.com`.
 
 ## Notes
 
@@ -74,7 +80,7 @@ The token lives in `storage.local` (never synced) and is only sent to `api.githu
 - Only github.com is supported. GitHub Enterprise would need its own host in `manifest.json` and
   its own API base URL.
 - If a request fails (rate limit, private repo without a token, bad token), a ⚠ appears next to
-  the diffstat. Its tooltip gives the reason.
+  the diffstat. Its tooltip gives the reason, and which token was used.
 - The extension finds the diffstat by GitHub's success/danger colour classes and only annotates
   pairs whose numbers equal the PR totals from the API. If GitHub changes its markup,
   `findDiffstatPairs` in `src/content.js` is the place to update.
