@@ -13,7 +13,7 @@ Hover over the numbers to see which files were excluded and their line counts. T
 appear only when at least one file matches **and** at least one doesn't, so a PR that only
 bumps `flake.lock` keeps GitHub's plain numbers.
 
-Once you mark files as *Viewed*, a pill next to the diffstat shows what is left to review: the
+Once you mark files as *Viewed*, a pill to the left of the diffstat shows what is left to review: the
 line counts without the viewed files, and a pie that fills up with the share of lines you have
 been through. It turns into a green *✓ viewed* when nothing is left. Hover over it to see the
 viewed files. This needs a token (see below).

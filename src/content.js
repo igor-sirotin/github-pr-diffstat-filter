@@ -208,18 +208,24 @@
     return pill;
   }
 
-  // Once some files are marked as viewed, a pill with what is left to review follows. When no
-  // file is excluded, the badge is just that pill, next to GitHub's untouched numbers.
-  // Otherwise it takes the place of GitHub's numbers (which get hidden) and keeps them in brackets:
-  //   +71 −211 (with flake.lock, Cargo.lock: +25,202 −56,795)
+  // Takes the place of GitHub's own numbers (which get hidden). Once some files are marked as
+  // viewed, a pill with what is left to review comes first; with excluded files, the filtered
+  // numbers are shown and the originals are kept in brackets:
+  //   ◔ +30 −12 left +71 −211 (with flake.lock, Cargo.lock: +25,202 −56,795)
   function renderBadge(pair, stats) {
     const badge = document.createElement('span');
     badge.className = BADGE_CLASS;
     if (stats.relevant) badge.title = tooltip(stats);
 
     const minus = pair.del.textContent.trim()[0] === '-' ? '-' : '\u2212';
+    // The pill leads, so the numbers keep their place at the right edge as it comes and goes.
+    if (stats.review) badge.append(renderReview(pair, stats.review, minus), ' ');
     if (!stats.relevant) {
-      badge.append(renderReview(pair, stats.review, minus));
+      badge.append(
+        countSpan(pair.add, `+${fmt(stats.total.additions)}`),
+        ' ',
+        countSpan(pair.del, `${minus}${fmt(stats.total.deletions)}`),
+      );
       return badge;
     }
     const orig = document.createElement('span');
@@ -238,7 +244,6 @@
       ' ',
       orig,
     );
-    if (stats.review) badge.append(' ', renderReview(pair, stats.review, minus));
     return badge;
   }
 
@@ -293,7 +298,7 @@
       if (pair.additions !== stats.total.additions || pair.deletions !== stats.total.deletions) continue;
       if (stats.relevant || stats.review) {
         placeBadge(pair, renderBadge(pair, stats));
-        setHidden(pair, stats.relevant);
+        setHidden(pair, true);
       } else {
         setHidden(pair, false);
         const existing = pair.del.nextElementSibling;
