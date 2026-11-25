@@ -1,6 +1,6 @@
 {
   "name": "gh-pr-diffstat-filter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser extension: GitHub PR diffstat without lockfiles",
   "scripts": {
     "test": "node --test test/*.test.js",
